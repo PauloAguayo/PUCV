@@ -8,30 +8,43 @@ import argparse
 import time
 from prepare_data import OurDataset
 from torch.utils.data import Dataset, DataLoader
+import shutil
+import matplotlib.pyplot as plt
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-d', '--data', required=True, help='path to dataset')
     parser.add_argument('-l', '--labels', required=True, help='path to labels')
-    parser.add_argument('-g', '--gpu', default=None, type=int, help='GPU id to use.')
-    parser.add_argument('-lr', '--LearningRate', default=0.01, type=float, help='initial learning rate', dest='lr')
-    parser.add_argument('-m', '--momentum', default=0.9, type=float, help='momentum')
+    parser.add_argument('-g', '--gpu', default=-100, type=int, help='GPU id to use.')
+    parser.add_argument('-lr', '--learningRate', default=0.01, type=float, help='initial learning rate', dest='lr')
     parser.add_argument('-w', '--window', default=3, type=int, help='window')
     parser.add_argument('-e', '--epochs', default=70, type=int, help='number of total epochs to run')
-    parser.add_argument('-b', '--batch_size', default=27, type=int, help='mini-batch size (default: 64)')
+    parser.add_argument('-b', '--batch_size', default=27, type=int, help='mini-batch size (default: 27)')
+    parser.add_argument('-v', '--evaluation', default=10, type=int, help='steps for evaluation (default: 10)')
     args = parser.parse_args()
     return(args)
 
 
-# def train_model(raw_data, true_label, model, crit, opti, n_epoch):
+def save_checkpoint(state, is_best, filename):  # .tar
+    # print('Saving '+filename+' ...')
+    # torch.save(state, filename+'.pth')
+    if is_best:
+        # print('Saving best model ...')
+        # shutil.copyfile(filename+'.pth', 'best_model_'+filename+'.pth')  #
+        print('Saving '+filename+' ...')
+        torch.save(state, 'best_model_'+filename+'.pth')
+
+
 def train_model():
 
     args = vars(parse_args())
 
-    cudnn.benchmark = True
-
-    torch.cuda.empty_cache()
-    device = torch.device('cuda:'+str(args['gpu']))
+    if args['gpu']==(-100):
+        device = torch.device('cpu')
+    else:
+        cudnn.benchmark = True
+        torch.cuda.empty_cache()
+        device = torch.device('cuda:'+str(args['gpu']))
 
     raw_data = np.genfromtxt(args['data'], delimiter=',')
     true_label = np.genfromtxt(args['labels'], delimiter=',')
@@ -54,14 +67,12 @@ def train_model():
     criterion = nn.CrossEntropyLoss()
 
     total_elapsed_time = 0.0
-    lm = 10
 
-    best_acc1 = 0
+    best_acc = 0
     best_train_score = np.infty
-    steps = 0
-    running_loss = 0
-    print_every = 10
-    train_losses, test_losses = [], []
+    train_losses, valid_losses = [], []
+    train_accss, valid_accss = [], []
+
     for epoch in range(args['epochs']):
         print('epoch',str(epoch))
         dataset_train.permute()
@@ -71,16 +82,17 @@ def train_model():
         train_corrects = 0
         train_total = 0
 
+        val_acs, val_ls = [], []
+
         for steps, (batch_x, batch_y) in enumerate(train_loader):
-            # print('Batch',str(steps),'of',str(len(train_loader)))
             optimizer.zero_grad()
 
-            outputs = model.forward(batch_x)
-            outputs = torch.reshape(outputs,(-1,12))
+            outcomes = model.forward(batch_x)
+            outcomes = torch.reshape(outcomes,(-1,12))
 
-            _, preds = torch.max(outputs,1)
+            _, preds = torch.max(outcomes,1)
 
-            loss = criterion(outputs, batch_y.long())
+            loss = criterion(outcomes, batch_y.long())
             loss.backward()
             optimizer.step()
 
@@ -88,46 +100,71 @@ def train_model():
             train_loss += loss.item()*len(batch_x)
             train_corrects += int(torch.sum(preds==batch_y))
 
-            if steps % lm == 0:
-                # print('Evaluation')
-                test_loss = 0
-                accuracy = 0
+            # EVALUATION
+            if steps % args['evaluation'] == 0:
+                val_loss = 0.0
+                val_corrects = 0
+                val_total = 0
                 model.eval()
+
                 with torch.no_grad():
-                    for em,(inputs, labels) in enumerate(valid_loader):
-                        # inputs, labels = inputs.to(device), labels.to(device)
-                        logps = model.forward(inputs)
-                        logps = torch.reshape(logps,(-1,12))
-                        batch_loss = criterion(logps, labels.long())
-                        test_loss += batch_loss.item()
+                    for batch_x_val, batch_y_val in valid_loader:
+                        outcomes_val = model.forward(batch_x_val)
+                        outcomes_val = torch.reshape(outcomes_val,(-1,12))
 
-                        ps = torch.exp(logps)
-                        top_p, top_class = ps.topk(1, dim=1)
-                        equals = top_class == labels.view(*top_class.shape)
-                        accuracy += torch.mean(equals.type(torch.FloatTensor)).item()
+                        _val, val_preds = torch.max(outcomes_val,1)
 
-                # train_losses.append(running_loss/len(train_loader))
-                # test_losses.append(test_loss/len(test_loader))
-                #
-                # score = float(accuracy/len(test_loader))
-                # train_score = float(running_loss/print_every)
-                # print(f"Epoch {epoch+1}/{args['epochs']}.. "
-                #       f"Train loss: {running_loss/print_every:.3f}.. "
-                #       f"Test loss: {test_loss/len(test_loader):.3f}.. "
-                #       f"Test accuracy: {accuracy/len(test_loader):.3f}")
-                # running_loss = 0
+                        loss_valid = criterion(outcomes_val, batch_y_val.long())
+
+                        val_total += len(batch_y_val)
+                        val_loss += loss_valid.item()*len(batch_x_val)
+                        val_corrects += int(torch.sum(val_preds==batch_y_val))
+
+
+                    epoch_val_loss = val_loss/val_total
+                    epoch_val_acc = np.float(val_corrects)/val_total
+
+                    val_acs.append(epoch_val_acc)
+                    val_ls.append(epoch_val_loss)
+
+                    print('Validation Loss: {:6.4f}, Validation Accuracy: {:6.2f}%;'.format(epoch_val_loss,epoch_val_acc*100))
+
                 model.train()
-
-
 
         epoch_train_loss = train_loss/train_total
         epoch_train_acc = np.float(train_corrects)/train_total
         epoch_elapsed_time = time.time()-start_time
         total_elapsed_time += epoch_elapsed_time
 
+        train_losses.append(epoch_train_loss)
+        train_accss.append(epoch_train_acc)
+
+        valid_losses.append(np.average(val_ls))
+        valid_accss.append(np.average(val_acs))
+
+        is_best = epoch_train_acc > best_acc
+        best_acc = max(epoch_train_acc, best_acc)
+
         print('Train Loss: {:6.4f}, Total Accuracy: {:6.2f}%, Time Consumption: {:6.2f} seconds;'.format(epoch_train_loss,epoch_train_acc*100, epoch_elapsed_time))
 
+        save_checkpoint({'epoch': epoch, 'arch': 'LSTM', 'state_dict': model.state_dict(), 'best_acc': best_acc,
+            'optimizer' : optimizer.state_dict()}, is_best,'LSTM')
+
+    plt.figure()
+    plt.plot(train_losses, label='Training loss')
+    plt.plot(valid_losses, label='Validation loss')
+    plt.legend(frameon=False)
+    plt.savefig('Losses.png')
+    # plt.show()
+
+    plt.figure()
+    plt.plot(train_accss, label='Training accuracy')
+    plt.plot(valid_accss, label='Validation accuracy')
+    plt.legend(frameon=False)
+    plt.savefig('Accuracy.png')
+
     return(total_elapsed_time)
+
 
 
 total_time_train = train_model()
