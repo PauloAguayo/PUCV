@@ -3,13 +3,12 @@ import numpy as np
 import torch.nn as nn
 import torch
 import torch.backends.cudnn as cudnn
-import pandas as pd
 import argparse
 import time
 from prepare_data import OurDataset
 from torch.utils.data import Dataset, DataLoader
-import shutil
 import matplotlib.pyplot as plt
+from sklearn.metrics import ConfusionMatrixDisplay
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -26,18 +25,17 @@ def parse_args():
 
 
 def save_checkpoint(state, is_best, filename):  # .tar
-    # print('Saving '+filename+' ...')
-    # torch.save(state, filename+'.pth')
     if is_best:
-        # print('Saving best model ...')
-        # shutil.copyfile(filename+'.pth', 'best_model_'+filename+'.pth')  #
         print('Saving '+filename+' ...')
         torch.save(state, 'best_model_'+filename+'.pth')
+        return('best_model_'+filename+'.pth')
 
 
 def train_model():
 
     args = vars(parse_args())
+
+    n_class = [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,20.]
 
     if args['gpu']==(-100):
         device = torch.device('cpu')
@@ -49,17 +47,22 @@ def train_model():
     raw_data = np.genfromtxt(args['data'], delimiter=',')
     true_label = np.genfromtxt(args['labels'], delimiter=',')
 
-    train_data = raw_data[:int(0.8*len(raw_data))]
-    train_label = true_label[:int(0.8*len(true_label))]
+    train_data = raw_data[:int(0.7*len(raw_data))]
+    train_label = true_label[:int(0.7*len(true_label))]
 
-    valid_data = raw_data[int(0.8*len(raw_data)):]
-    valid_label = true_label[int(0.8*len(true_label)):]
+    eval_data = raw_data[int(0.7*len(raw_data)):int(0.9*len(raw_data))]
+    eval_label = true_label[int(0.7*len(true_label)):int(0.9*len(true_label))]
 
-    dataset_train = OurDataset(train_data,train_label,args['window'], device=device)
-    dataset_valid = OurDataset(valid_data,valid_label,args['window'], device=device)
+    test_data = raw_data[int(0.9*len(raw_data)):]
+    test_label = true_label[int(0.9*len(true_label)):]
+
+    dataset_train = OurDataset(train_data,train_label,args['window'], device=device,n_class)
+    dataset_eval = OurDataset(eval_data,eval_label,args['window'], device=device,n_class)
+    dataset_test = OurDataset(test_data,test_label,args['window'], device=device,n_class)
 
     train_loader = DataLoader(dataset_train, batch_size=args['batch_size'], shuffle=True, num_workers=0)
-    valid_loader = DataLoader(dataset_valid, batch_size=args['batch_size'], shuffle=True, num_workers=0)
+    eval_loader = DataLoader(dataset_eval, batch_size=args['batch_size'], shuffle=True, num_workers=0)
+    test_loader = DataLoader(dataset_test, batch_size=1, shuffle=True, num_workers=0)
 
     model = Net(device=device).to(device)
 
@@ -69,9 +72,8 @@ def train_model():
     total_elapsed_time = 0.0
 
     best_acc = 0
-    best_train_score = np.infty
-    train_losses, valid_losses = [], []
-    train_accss, valid_accss = [], []
+    train_losses, eval_losses = [], []
+    train_accss, eval_accss = [], []
 
     for epoch in range(args['epochs']):
         print('epoch',str(epoch))
@@ -82,7 +84,7 @@ def train_model():
         train_corrects = 0
         train_total = 0
 
-        val_acs, val_ls = [], []
+        ev_acs, ev_ls = [], []
 
         for steps, (batch_x, batch_y) in enumerate(train_loader):
             optimizer.zero_grad()
@@ -102,32 +104,32 @@ def train_model():
 
             # EVALUATION
             if steps % args['evaluation'] == 0:
-                val_loss = 0.0
-                val_corrects = 0
-                val_total = 0
+                ev_loss = 0.0
+                ev_corrects = 0
+                ev_total = 0
                 model.eval()
 
                 with torch.no_grad():
-                    for batch_x_val, batch_y_val in valid_loader:
-                        outcomes_val = model.forward(batch_x_val)
-                        outcomes_val = torch.reshape(outcomes_val,(-1,12))
+                    for batch_x_ev, batch_y_ev in eval_loader:
+                        outcomes_ev = model.forward(batch_x_ev)
+                        outcomes_ev = torch.reshape(outcomes_ev,(-1,12))
 
-                        _val, val_preds = torch.max(outcomes_val,1)
+                        _ev, ev_preds = torch.max(outcomes_ev,1)
 
-                        loss_valid = criterion(outcomes_val, batch_y_val.long())
+                        loss_eval = criterion(outcomes_ev, batch_y_ev.long())
 
-                        val_total += len(batch_y_val)
-                        val_loss += loss_valid.item()*len(batch_x_val)
-                        val_corrects += int(torch.sum(val_preds==batch_y_val))
+                        ev_total += len(batch_y_ev)
+                        ev_loss += loss_eval.item()*len(batch_x_ev)
+                        ev_corrects += int(torch.sum(ev_preds==batch_y_ev))
 
 
-                    epoch_val_loss = val_loss/val_total
-                    epoch_val_acc = np.float(val_corrects)/val_total
+                    epoch_ev_loss = ev_loss/ev_total
+                    epoch_ev_acc = np.float(ev_corrects)/ev_total
 
-                    val_acs.append(epoch_val_acc)
-                    val_ls.append(epoch_val_loss)
+                    ev_acs.append(epoch_ev_acc)
+                    ev_ls.append(epoch_ev_loss)
 
-                    print('Validation Loss: {:6.4f}, Validation Accuracy: {:6.2f}%;'.format(epoch_val_loss,epoch_val_acc*100))
+                    print('Evaluation Loss: {:6.4f}, Evaluation Accuracy: {:6.2f}%;'.format(epoch_ev_loss,epoch_ev_acc*100))
 
                 model.train()
 
@@ -139,31 +141,42 @@ def train_model():
         train_losses.append(epoch_train_loss)
         train_accss.append(epoch_train_acc)
 
-        valid_losses.append(np.average(val_ls))
-        valid_accss.append(np.average(val_acs))
+        eval_losses.append(np.average(ev_ls))
+        eval_accss.append(np.average(ev_acs))
 
         is_best = epoch_train_acc > best_acc
         best_acc = max(epoch_train_acc, best_acc)
 
         print('Train Loss: {:6.4f}, Total Accuracy: {:6.2f}%, Time Consumption: {:6.2f} seconds;'.format(epoch_train_loss,epoch_train_acc*100, epoch_elapsed_time))
 
-        save_checkpoint({'epoch': epoch, 'arch': 'LSTM', 'state_dict': model.state_dict(), 'best_acc': best_acc,
-            'optimizer' : optimizer.state_dict()}, is_best,'LSTM')
+        filename = save_checkpoint({'epoch': epoch, 'arch': 'LSTM', 'state_dict': model.state_dict(), 'best_acc': best_acc,
+            'optimizer' : optimizer.state_dict()}, is_best,'LSTM_'+args['window']+'w'])
 
     plt.figure()
     plt.plot(train_losses, label='Training loss')
-    plt.plot(valid_losses, label='Validation loss')
+    plt.plot(eval_losses, label='Evaluation loss')
     plt.legend(frameon=False)
-    plt.savefig('Losses.png')
-    # plt.show()
+    plt.savefig('Losses_'+args['window']+'w.png')
 
     plt.figure()
     plt.plot(train_accss, label='Training accuracy')
-    plt.plot(valid_accss, label='Validation accuracy')
+    plt.plot(eval_accss, label='Evaluation accuracy')
     plt.legend(frameon=False)
-    plt.savefig('Accuracy.png')
+    plt.savefig('Accuracy_'+args['window']+'w.png')
 
-    return(total_elapsed_time)
+    print(total_elapsed_time)
+    # 
+    # model.load_state_dict(torch.load('best_model_LSTM_'+args['window']+'w'+'.pth', map_location=device)['state_dict'])
+    # model.to(device)
+    #
+    # model.eval()
+    #
+    # for batch_x_test, batch_y_test in test_loader:
+    #     outcomes_test = model.forward(batch_x_test)
+    #     outcomes_test = torch.reshape(outcomes_test,(-1,12))
+    #
+    #     _test, test_preds = torch.max(outcomes_test,1)
+    #     ConfusionMatrixDisplay.from_predictions(batch_y_test, test_preds, normalize=True, display_labels=n_class)
 
 
 

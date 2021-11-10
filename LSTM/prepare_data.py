@@ -2,8 +2,7 @@ import torch
 import numpy as np
 from torch.utils.data import Dataset
 
-def format_training_data(pet_names, pet_labels, window, device):
-    characters = [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,20.]
+def format_training_data(pet_names, pet_labels, window, device, characters):
 
     pet_names_numeric = []
     for i in range(len(pet_names)):
@@ -17,8 +16,8 @@ def format_training_data(pet_names, pet_labels, window, device):
     return(x, y)
 
 class OurDataset(Dataset):
-    def __init__(self, pet_names,pet_labels,window, device):
-        self.x, self.y = format_training_data(pet_names,pet_labels,window,device)
+    def __init__(self, pet_names,pet_labels,window, device, characters):
+        self.x, self.y = format_training_data(pet_names,pet_labels,window,device,characters)
         self.permute()
 
     def __getitem__(self, idx):
