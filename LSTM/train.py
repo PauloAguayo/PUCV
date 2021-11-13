@@ -10,7 +10,7 @@ from datetime import datetime
 from prepare_data import OurDataset
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, f1_score, precision_score, recall_score, accuracy_score
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -48,7 +48,7 @@ def train_model():
         device = torch.device('cuda:'+str(args['gpu']))
 
     date = datetime.today().strftime('%Y-%m-%d')
-    destination_folder = os.path.join('results',date)
+    destination_folder = os.path.join('results',date,str(args['window'])+'W')
 
     if not os.path.exists(destination_folder):
         os.makedirs(os.path.join(destination_folder,str(0)))
@@ -195,12 +195,24 @@ def train_model():
             _test, test_preds = torch.max(outcomes_test,1)
             batch_y_test = batch_y_test.to('cpu')
             test_preds = test_preds.to('cpu')
+
+            accuracy = accuracy_score(batch_y_test, test_preds)
+            f1 = f1_score(batch_y_test, test_preds, average='micro')
+            precision = precision_score(batch_y_test, test_preds, average='micro')
+            recall = recall_score(batch_y_test, test_preds, average='micro')
             cm = confusion_matrix(batch_y_test, test_preds, labels=[class_array.index(k) for k in class_array])
-            disp = ConfusionMatrixDisplay(confusion_matrix=cm,display_labels=[class_array.index(k) for k in class_array])
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm,display_labels=class_array)
 
             plt.figure()
             disp.plot()
             plt.savefig(os.path.join(new_dir,'ConfusionMatrix_'+str(args['window'])+'w.png'))
+
+    print('Accuracy = {:6.4f}%, Precision = {:6.4f}%, Recall = {:6.4f}%, F1 = {:6.4f}%;'.format(accuracy*100,precision*100, recall*100, f1*100))
+
+    file1 = open(os.path.join(new_dir,'metrics.txt'),"w")
+    L = ['Accuracy = {:6.4f}% \n'.format(accuracy*100), 'Precision = {:6.4f}% \n'.format(precision*100), 'Recall = {:6.4f}% \n'.format(recall*100), 'F1 = {:6.4f}% \n'.format(f1*100)]
+    file1.writelines(L)
+    file1.close()
 
     return(total_elapsed_time)
 

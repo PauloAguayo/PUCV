@@ -1,0 +1,4 @@
+Accuracy = 81.1723% 
+Precision = 81.1723% 
+Recall = 81.1723% 
+F1 = 81.1723% 
