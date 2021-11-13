@@ -5,10 +5,12 @@ import torch
 import torch.backends.cudnn as cudnn
 import argparse
 import time
+import os
+from datetime import datetime
 from prepare_data import OurDataset
 from torch.utils.data import Dataset, DataLoader
 import matplotlib.pyplot as plt
-from sklearn.metrics import ConfusionMatrixDisplay
+from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 def parse_args():
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -24,10 +26,10 @@ def parse_args():
     return(args)
 
 
-def save_checkpoint(state, is_best, filename):  # .tar
+def save_checkpoint(state, is_best, filename, dir):  # .tar
     if is_best:
         print('Saving '+filename+' ...')
-        torch.save(state, 'best_model_'+filename+'.pth')
+        torch.save(state, os.path.join(dir,'best_model_'+filename+'.pth'))
         return('best_model_'+filename+'.pth')
 
 
@@ -35,7 +37,8 @@ def train_model():
 
     args = vars(parse_args())
 
-    n_class = [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,20.]
+    class_array = [1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,20.]
+    n_classes = len(class_array)
 
     if args['gpu']==(-100):
         device = torch.device('cpu')
@@ -43,6 +46,20 @@ def train_model():
         cudnn.benchmark = True
         torch.cuda.empty_cache()
         device = torch.device('cuda:'+str(args['gpu']))
+
+    date = datetime.today().strftime('%Y-%m-%d')
+    destination_folder = os.path.join('results',date)
+
+    if not os.path.exists(destination_folder):
+        os.makedirs(os.path.join(destination_folder,str(0)))
+        new_dir = os.path.join(destination_folder,str(0))
+    else:
+        for iter in range(100000):
+            new_dir = os.path.join(destination_folder,str(iter))
+            if not os.path.exists(new_dir):
+                os.makedirs(new_dir)
+                break
+
 
     raw_data = np.genfromtxt(args['data'], delimiter=',')
     true_label = np.genfromtxt(args['labels'], delimiter=',')
@@ -56,13 +73,13 @@ def train_model():
     test_data = raw_data[int(0.9*len(raw_data)):]
     test_label = true_label[int(0.9*len(true_label)):]
 
-    dataset_train = OurDataset(train_data,train_label,args['window'], device=device,n_class)
-    dataset_eval = OurDataset(eval_data,eval_label,args['window'], device=device,n_class)
-    dataset_test = OurDataset(test_data,test_label,args['window'], device=device,n_class)
+    dataset_train = OurDataset(train_data,train_label,args['window'], device=device, characters=class_array)
+    dataset_eval = OurDataset(eval_data,eval_label,args['window'], device=device, characters=class_array)
+    dataset_test = OurDataset(test_data,test_label,args['window'], device=device, characters=class_array)
 
     train_loader = DataLoader(dataset_train, batch_size=args['batch_size'], shuffle=True, num_workers=0)
     eval_loader = DataLoader(dataset_eval, batch_size=args['batch_size'], shuffle=True, num_workers=0)
-    test_loader = DataLoader(dataset_test, batch_size=1, shuffle=True, num_workers=0)
+    test_loader = DataLoader(dataset_test, batch_size=len(test_label), shuffle=True, num_workers=0)
 
     model = Net(device=device).to(device)
 
@@ -90,7 +107,7 @@ def train_model():
             optimizer.zero_grad()
 
             outcomes = model.forward(batch_x)
-            outcomes = torch.reshape(outcomes,(-1,12))
+            outcomes = torch.reshape(outcomes,(-1,n_classes))
 
             _, preds = torch.max(outcomes,1)
 
@@ -112,7 +129,7 @@ def train_model():
                 with torch.no_grad():
                     for batch_x_ev, batch_y_ev in eval_loader:
                         outcomes_ev = model.forward(batch_x_ev)
-                        outcomes_ev = torch.reshape(outcomes_ev,(-1,12))
+                        outcomes_ev = torch.reshape(outcomes_ev,(-1,n_classes))
 
                         _ev, ev_preds = torch.max(outcomes_ev,1)
 
@@ -150,36 +167,46 @@ def train_model():
         print('Train Loss: {:6.4f}, Total Accuracy: {:6.2f}%, Time Consumption: {:6.2f} seconds;'.format(epoch_train_loss,epoch_train_acc*100, epoch_elapsed_time))
 
         filename = save_checkpoint({'epoch': epoch, 'arch': 'LSTM', 'state_dict': model.state_dict(), 'best_acc': best_acc,
-            'optimizer' : optimizer.state_dict()}, is_best,'LSTM_'+args['window']+'w'])
+            'optimizer' : optimizer.state_dict()}, is_best,'LSTM_'+str(args['window'])+'w', new_dir)
 
     plt.figure()
     plt.plot(train_losses, label='Training loss')
     plt.plot(eval_losses, label='Evaluation loss')
     plt.legend(frameon=False)
-    plt.savefig('Losses_'+args['window']+'w.png')
+    plt.savefig(os.path.join(new_dir,'Losses_'+str(args['window'])+'w.png'))
 
     plt.figure()
     plt.plot(train_accss, label='Training accuracy')
     plt.plot(eval_accss, label='Evaluation accuracy')
     plt.legend(frameon=False)
-    plt.savefig('Accuracy_'+args['window']+'w.png')
+    plt.savefig(os.path.join(new_dir,'Accuracy_'+str(args['window'])+'w.png'))
 
-    print(total_elapsed_time)
-    # 
-    # model.load_state_dict(torch.load('best_model_LSTM_'+args['window']+'w'+'.pth', map_location=device)['state_dict'])
-    # model.to(device)
-    #
-    # model.eval()
-    #
-    # for batch_x_test, batch_y_test in test_loader:
-    #     outcomes_test = model.forward(batch_x_test)
-    #     outcomes_test = torch.reshape(outcomes_test,(-1,12))
-    #
-    #     _test, test_preds = torch.max(outcomes_test,1)
-    #     ConfusionMatrixDisplay.from_predictions(batch_y_test, test_preds, normalize=True, display_labels=n_class)
+    model.load_state_dict(torch.load(os.path.join(new_dir,'best_model_LSTM_'+str(args['window'])+'w'+'.pth'), map_location=device)['state_dict'])
+    # model.load_state_dict(torch.load('best_model_LSTM.pth', map_location=device)['state_dict'])
+    model.to(device)
+
+    model.eval()
+
+    with torch.no_grad():
+        for batch_x_test, batch_y_test in test_loader:
+            outcomes_test = model.forward(batch_x_test)
+            outcomes_test = torch.reshape(outcomes_test,(-1,n_classes))
+
+            _test, test_preds = torch.max(outcomes_test,1)
+            batch_y_test = batch_y_test.to('cpu')
+            test_preds = test_preds.to('cpu')
+            cm = confusion_matrix(batch_y_test, test_preds, labels=[class_array.index(k) for k in class_array])
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm,display_labels=[class_array.index(k) for k in class_array])
+
+            plt.figure()
+            disp.plot()
+            plt.savefig(os.path.join(new_dir,'ConfusionMatrix_'+str(args['window'])+'w.png'))
+
+    return(total_elapsed_time)
+
 
 
 
 total_time_train = train_model()
 
-print('\nThe total time consdumption of this trainings is {:.2f} seconds.'.format(total_time_train))
+print('\nThe total time consumption of this trainings is {:.2f} seconds.'.format(total_time_train))
