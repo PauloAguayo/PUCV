@@ -1,0 +1,5 @@
+Training Accuracy = 82.0308% 
+Accuracy = 73.3237% 
+Precision = 31.2741% 
+Recall = 29.1791% 
+F1 = 27.9497% 
