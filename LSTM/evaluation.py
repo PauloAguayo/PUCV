@@ -66,9 +66,14 @@ def train_model():
     train_data = raw_data[:int(0.7*len(raw_data))]
     train_label = true_label[:int(0.7*len(true_label))]
 
+    eval_data = raw_data[int(0.7*len(raw_data)):]
+    eval_label = true_label[int(0.7*len(true_label)):]
+
     dataset_train = OurDataset(train_data,train_label,args['window'], device=device, characters=class_array)
+    dataset_eval = OurDataset(eval_data,eval_label,args['window'], device=device, characters=class_array)
 
     train_loader = DataLoader(dataset_train, batch_size=args['batch_size'], shuffle=True, num_workers=0)
+    eval_loader = DataLoader(dataset_eval, batch_size=len(eval_label), shuffle=True, num_workers=0)
 
     model = Net(device=device).to(device)
 
@@ -127,23 +132,8 @@ def train_model():
     filename = save_checkpoint({'epoch': epoch, 'arch': 'LSTM', 'state_dict': model.state_dict(), 'best_acc': best_acc,
         'optimizer' : optimizer.state_dict()}, is_best,'final_LSTM_'+str(args['window'])+'w', new_dir)
 
-
-
-    if args['gpu']==(-100):
-        device = torch.device('cpu')
-    else:
-        cudnn.benchmark = True
-        torch.cuda.empty_cache()
-        device = torch.device('cuda:'+str(args['gpu']))
-
     model.load_state_dict(torch.load(os.path.join(new_dir,'best_model_LSTM_'+str(args['window'])+'w'+'.pth'), map_location=device)['state_dict'])
     model.to(device)
-
-    eval_data = raw_data[int(0.7*len(raw_data)):]
-    eval_label = true_label[int(0.7*len(true_label)):]
-
-    dataset_eval = OurDataset(eval_data,eval_label,args['window'], device=device, characters=class_array)
-    eval_loader = DataLoader(dataset_eval, batch_size=len(eval_label), shuffle=True, num_workers=0)
 
     ev_loss = 0.0
     ev_corrects = 0
