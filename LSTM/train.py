@@ -130,7 +130,7 @@ def train_model():
     filename = save_checkpoint({'epoch': epoch, 'arch': 'LSTM', 'state_dict': model.state_dict(), 'best_acc': best_acc,
         'optimizer' : optimizer.state_dict()}, is_best,'final_LSTM_'+str(args['window'])+'w', new_dir)
 
-    # 
+    #
     #
     # if args['gpu']==(-100):
     #     device = torch.device('cpu')
@@ -203,6 +203,20 @@ def train_model():
         cm = confusion_matrix(batch, outcomes_preds, labels=[class_array.index(k) for k in class_array])
         disp = ConfusionMatrixDisplay(confusion_matrix=cm,display_labels=class_array)
 
+        FP = cm.sum(axis=0) - np.diag(cm)
+        FN = cm.sum(axis=1) - np.diag(cm)
+        TP = np.diag(cm)
+        TN = cm.sum() - (FP+FN+TP)
+
+        FP = FP.astype(float)
+        FN = FN.astype(float)
+        TP = TP.astype(float)
+        TN = TN.astype(float)
+
+        print(FP,FN,TP,TN)
+
+        specificity = float(TN/(TN+FP))
+
         plt.figure()
         disp.plot()
         plt.savefig(os.path.join(new_dir,'ConfusionMatrix_'+str(args['window'])+'w.png'))
@@ -211,10 +225,10 @@ def train_model():
     print('Training Accuracy = {:6.4f}%'.format(np.average(train_accss)*100))
     print(' ')
     print('Evaluation metrics')
-    print('Accuracy = {:6.4f}%, Precision = {:6.4f}%, Recall = {:6.4f}%, F1 = {:6.4f}%;'.format(accuracy*100,precision*100, recall*100, f1*100))
+    print('Accuracy = {:6.4f}%, Precision = {:6.4f}%, Recall = {:6.4f}%, F1 = {:6.4f}%, Specificity = {:6.4f}%;'.format(accuracy*100,precision*100, recall*100, f1*100, specificity*100))
 
     file1 = open(os.path.join(new_dir,'metrics.txt'),"w")
-    L = ['Training Accuracy = {:6.4f}% \n'.format(np.average(train_accss)*100), 'Accuracy = {:6.4f}% \n'.format(accuracy*100), 'Precision = {:6.4f}% \n'.format(precision*100), 'Recall = {:6.4f}% \n'.format(recall*100), 'F1 = {:6.4f}% \n'.format(f1*100)]
+    L = ['Training Accuracy = {:6.4f}% \n'.format(np.average(train_accss)*100), 'Accuracy = {:6.4f}% \n'.format(accuracy*100), 'Precision = {:6.4f}% \n'.format(precision*100), 'Recall = {:6.4f}% \n'.format(recall*100), 'F1 = {:6.4f}% \n'.format(f1*100), 'Specificity = {:6.4f}% \n'.format(specificity*100)]
     file1.writelines(L)
     file1.close()
 

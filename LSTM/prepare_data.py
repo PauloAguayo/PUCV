@@ -48,7 +48,4 @@ class randomizeDataset(object):
         self.new_raw_data = np.array([self.raw_data[i] for i in self.rows])
         self.new_true_label = np.array([self.true_label[i] for i in self.rows])
 
-        print(self.new_raw_data)
-        print(self.new_true_label)
-
         return([self.new_raw_data,self.new_true_label])
