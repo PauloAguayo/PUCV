@@ -2,6 +2,9 @@
 from ydata_synthetic.preprocessing.timeseries.utils import real_data_loading
 import pandas as pd
 from ydata_synthetic.synthesizers.timeseries import TimeGAN
+from sklearn.decomposition import PCA
+from sklearn.manifold import TSNE
+
 
 seq_len = 24        # Timesteps
 n_seq = 28          # Features
@@ -21,18 +24,14 @@ gan_args = [batch_size, learning_rate, beta_1, beta_2, noise_dim, data_dim, dim]
 
 file_path = "energydata_complete.csv"
 energy_df = pd.read_csv(file_path)
-
 energy_df['date'] = pd.to_datetime(energy_df['date'])
-
 energy_df = energy_df.set_index('date').sort_index()
 
 # Data transformations to be applied prior to be used with the synthesizer model
 energy_data = real_data_loading(energy_df.values, seq_len=seq_len)
-
 print(len(energy_data), energy_data[0].shape)
 
+# Training
 synth = TimeGAN(model_parameters=gan_args, hidden_dim=hidden_dim, seq_len=seq_len, n_seq=n_seq, gamma=1)
 synth.train(energy_data, train_steps=500)
 synth.save('synth_energy.pkl')
-
-synth_data = synth.sample(len(energy_data))
