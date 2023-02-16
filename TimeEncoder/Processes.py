@@ -22,7 +22,8 @@ def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, dev
     # else:
     #     model = LSTMNet(input_dim, hidden_dim, output_dim, n_layers)
 
-    model = TimeEncoder(input_dim, hidden_dim, n_out, n_layers, batch_size, device)
+    # model = TimeEncoder(input_dim, hidden_dim, n_out, n_layers, batch_size, device)
+    model = torch.load('models/model_7/t_encoder_10_20_best.pth')
     model.to(device)
 
     # Defining loss function and optimizer

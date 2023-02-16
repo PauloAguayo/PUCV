@@ -1,3 +1,4 @@
+print('--> Importing libraries...')
 from utils import data_loading, model_path
 from Processes import train, evaluate
 import torch
@@ -15,20 +16,24 @@ batch_size = 16
 learning_rate = 0.0001
 EPOCHS = 100
 
+
+print('--> Loading data...')
 train_path = "data_train_24.csv"
 train_df = pd.read_csv(train_path)
 
-test_path = "data_test_24.csv"
-test_df = pd.read_csv(test_path)
+#test_path = "data_test_24.csv"
+#test_df = pd.read_csv(test_path)
+
+
 
 data_train = data_loading(train_df.values, seq_len=seq_len, n_signal=n_signal)
 #print(np.array(data_train[0]),np.array(data_train[1]))
 train_data = TensorDataset(torch.from_numpy(np.array(data_train[0])), torch.from_numpy(np.array(data_train[1])))
 train_loader = DataLoader(train_data, shuffle=True, batch_size=batch_size, drop_last=True)
 
-data_test = data_loading(test_df.values, seq_len=seq_len, n_signal=n_signal)
-test_data = TensorDataset(torch.from_numpy(np.array(data_test[0])), torch.from_numpy(np.array(data_test[1])))
-test_loader = DataLoader(test_data, shuffle=True, batch_size=batch_size, drop_last=True)
+#data_test = data_loading(test_df.values, seq_len=seq_len, n_signal=n_signal)
+#test_data = TensorDataset(torch.from_numpy(np.array(data_test[0])), torch.from_numpy(np.array(data_test[1])))
+#test_loader = DataLoader(test_data, shuffle=True, batch_size=batch_size, drop_last=True)
 
 # torch.cuda.is_available() checks and returns a Boolean True if a GPU is available, else it'll return False
 is_cuda = torch.cuda.is_available()
@@ -40,6 +45,10 @@ else:
     device = torch.device("cpu")
 
 path = os.path.join(model_path('models'),'t_encoder.pth')
+
+print(device)
+
+print('--> Training...')
 
 time_model = train(train_loader, learning_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS, 500, 10, path)
 
