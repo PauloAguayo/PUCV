@@ -1,18 +1,19 @@
-from utils import data_loading
+from utils import data_loading, model_path
 from Processes import train, evaluate
 import torch
 from torch.utils.data import TensorDataset, DataLoader
 import pandas as pd
 import numpy as np
+import os
 
 seq_len = 24
 n_signal = 3
 hidden_dim = 8
 n_out = 1
 n_layers = 3
-batch_size = 128
-learning_rate = 0.001
-EPOCHS = 2
+batch_size = 16
+learning_rate = 0.0001
+EPOCHS = 100
 
 train_path = "data_train_24.csv"
 train_df = pd.read_csv(train_path)
@@ -38,7 +39,8 @@ if is_cuda:
 else:
     device = torch.device("cpu")
 
+path = os.path.join(model_path('models'),'t_encoder.pth')
 
-time_model = train(train_loader, learning_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS)
+time_model = train(train_loader, learning_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS, 500, 10, path)
 
 gru_outputs, targets, gru_sMAPE = evaluate(time_model, test_loader)

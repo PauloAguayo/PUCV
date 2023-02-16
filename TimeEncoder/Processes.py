@@ -4,8 +4,15 @@ from Models import TimeEncoder
 import time
 
 
+def best_model(val,reference,path, model):
+    if val<reference:
+        save_path = path.split('.')[0]+'_best.'+path.split('.')[1]
+        torch.save(model, save_path)
+        reference = val
+    return(reference)
 
-def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS):#, model_type="GRU"):
+
+def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS, n_steps, n_epochs, save_path):#, model_type="GRU"):
 
     # Setting common hyperparameters
     input_dim = next(iter(train_loader))[0].shape[2]
@@ -26,6 +33,7 @@ def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, dev
     # print("Starting Training of {} model".format(model_type))
     print("Starting Training")
     epoch_times = []
+    best_loss = 10000000000
     # Start training loop
     for epoch in range(1,EPOCHS+1):
         start_time = time.perf_counter()
@@ -47,13 +55,20 @@ def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, dev
             loss.backward()
             optimizer.step()
             avg_loss += loss.item()
-            if counter%200 == 0:
+            if counter%n_steps == 0:
                 print("Epoch {}......Step: {}/{}....... Average Loss for Epoch: {}".format(epoch, counter, len(train_loader), avg_loss/counter))
+                best_model(float(avg_loss/counter),best_loss,save_path,model)
         current_time = time.perf_counter()
         print("Epoch {}/{} Done, Total Loss: {}".format(epoch, EPOCHS, avg_loss/len(train_loader)))
         print("Total Time Elapsed: {} seconds".format(str(current_time-start_time)))
         epoch_times.append(current_time-start_time)
+        best_model(float(avg_loss/len(train_loader)),best_loss,save_path, model)
+        if epoch%n_epochs == 0:
+            save_path = save_path.split('.')[0]+'_'+str(epoch)+'.'+save_path.split('.')[1]
+            torch.save(model, save_path)
     print("Total Training Time: {} seconds".format(str(sum(epoch_times))))
+    save_path = save_path.split('.')[0]+'_'+str(epoch)+'.'+save_path.split('.')[1]
+    torch.save(model, save_path)
     return model
 
 def evaluate(model, test_data):#, label_scalers):

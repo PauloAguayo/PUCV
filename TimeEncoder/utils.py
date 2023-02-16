@@ -1,5 +1,17 @@
 import numpy as np
+import os
 #from sklearn.preprocessing import MinMaxScaler
+
+def model_path(path):
+    if not os.listdir(path): # empty directory
+        os.mkdir(os.path.join(path,'model_1'))
+        return(os.path.join(path,'model_1'))
+    else:
+        for i in os.listdir(path):
+            new_path = i.split('_')[0]+'_'+str(int(i.split('_')[1])+1)
+            if not os.path.exists(os.path.join(path,new_path)):
+                os.mkdir(os.path.join(path,new_path))
+                return(os.path.join(path,new_path))
 
 def order_batch(self, data, ind):
     d = []
