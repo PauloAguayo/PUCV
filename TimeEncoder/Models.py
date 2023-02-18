@@ -15,13 +15,12 @@ class Recovery(nn.Module):
         self.batch_size = batch_size
 
         self.gru = nn.GRU(self.input_dim, self.hidden_dim, self.n_layers, batch_first=True)
+
         self.fc = nn.Linear(self.hidden_dim, self.n_out)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, h):
         out, h = self.gru(x, h)
-        #out = torch.flatten(out)
-        #print(out.size())
         out = self.fc(self.sigmoid(out[:,-1]))
         return(out, h)
 
@@ -41,12 +40,13 @@ class Embedder(nn.Module):
         self.batch_size = batch_size
 
         self.gru = nn.GRU(self.input_dim, self.hidden_dim, self.n_layers, batch_first=True)
+
         self.fc = nn.Linear(self.hidden_dim, self.n_out)
         self.sigmoid = nn.Sigmoid()
 
     def forward(self, x, h):
         out, h = self.gru(x, h)
-        out = self.fc(self.sigmoid(out))#[:,-1]))
+        out = self.fc(self.sigmoid(out))
         return(out, h)
 
     def init_hidden(self):
@@ -61,11 +61,9 @@ class TimeEncoder(nn.Module):
         self.Recovery = Recovery(input_dim, hidden_dim, n_out, n_layers, batch_size, device)
 
     def forward(self, x, h):
-        #print(x.size(), h.size())
         out, h = self.Embedder(x, h)
-        #print(out.size(), self.h.data.size())
+
         out, self.h = self.Recovery(out, self.h.data)
-        #print()
         return(out, self.h)
 
     def init_hidden(self):

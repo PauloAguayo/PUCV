@@ -1,0 +1,9 @@
+learning rate = 0.0001
+hidden dim = 8
+n neurons output = 1
+n layers = 3
+batch size = 16
+epochs = 200
+model type = LSTM
+previous model = False
+best error = 0.06671122968092096

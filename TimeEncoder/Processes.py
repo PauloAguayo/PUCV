@@ -1,38 +1,60 @@
 import torch
 import torch.nn as nn
 from Models import TimeEncoder
+# from Models_d import TimeEncoder
 import time
+import os
+import numpy as np
 
 
-def best_model(val,reference,path, model):
+
+def details(path,learn_rate, hidden_dim, n_out, n_layers, batch_size, EPOCHS, model_type, true_model, score):
+    path_ = r"{}".format(path)
+    lr = 'learning rate = '+str(learn_rate)
+    hd = 'hidden dim = '+str(hidden_dim)
+    no = 'n neurons output = '+str(n_out)
+    nl = 'n layers = '+str(n_layers)
+    bs = 'batch size = '+str(batch_size)
+    e = 'epochs = '+str(EPOCHS)
+    mt = 'model type = '+str(model_type)
+    tm = 'previous model = '+str(true_model)
+    be = 'best error = '+str(score)
+    lines = [lr, hd, no, nl, bs, e, mt, tm, be]
+    new_path = path_.split("\\")[:-1]
+    with open(r"{}".format(os.path.join(*new_path,'details.txt')), 'w') as f:
+        for line in lines:
+            f.write(line)
+            f.write('\n')
+
+def best_model(val,reference,path, model, learn_rate, hidden_dim, n_out, n_layers, batch_size, EPOCHS, model_type, true_model):
     if val<reference:
         save_path = path.split('.')[0]+'_best.'+path.split('.')[1]
         torch.save(model, save_path)
         reference = val
+        details(save_path,learn_rate, hidden_dim, n_out, n_layers, batch_size, EPOCHS, model_type, true_model, reference)
     return(reference)
 
-
-def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS, n_steps, n_epochs, save_path):#, model_type="GRU"):
+def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS, n_steps, n_epochs, save_path, model_type, true_model):
+    #global learn_rate, hidden_dim, n_out, n_layers, batch_size, EPOCHS, model_type, true_model
 
     # Setting common hyperparameters
     input_dim = next(iter(train_loader))[0].shape[2]
-    # Instantiating the models
-    # if model_type == "GRU":
-    #     model = GRUNet(input_dim, hidden_dim, output_dim, n_layers)
-    # else:
-    #     model = LSTMNet(input_dim, hidden_dim, output_dim, n_layers)
 
-    # model = TimeEncoder(input_dim, hidden_dim, n_out, n_layers, batch_size, device)
-    model = torch.load('models/model_7/t_encoder_10_20_best.pth')
+    # Instantiating the models
+    if true_model!=False:
+        model = torch.load(true_model)
+    else:
+        model = TimeEncoder(input_dim, hidden_dim, n_out, n_layers, batch_size, device, model_type)
+
     model.to(device)
 
     # Defining loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=learn_rate)
-
     model.train()
     # print("Starting Training of {} model".format(model_type))
-    print("Starting Training")
+    print("--> Starting Training")
+    print("-->", str(model_type), "net")
     epoch_times = []
     best_loss = 10000000000
     # Start training loop
@@ -44,11 +66,11 @@ def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, dev
         for x, label in train_loader:
             label = torch.reshape(label, (x.size(0),1))
             counter += 1
-            h = h.data
-            # if model_type == "GRU":
-            #     h = h.data
-            # else:
-            #     h = tuple([e.data for e in h])
+            #h = h.data
+            if model_type == "GRU":
+                h = h.data
+            else:
+                h = tuple([e.data for e in h])
             model.zero_grad()
 
             out, h = model(x.to(device).float(), h)
@@ -58,21 +80,21 @@ def train(train_loader, learn_rate, hidden_dim, n_out, n_layers, batch_size, dev
             avg_loss += loss.item()
             if counter%n_steps == 0:
                 print("Epoch {}......Step: {}/{}....... Average Loss for Epoch: {}".format(epoch, counter, len(train_loader), avg_loss/counter))
-                best_model(float(avg_loss/counter),best_loss,save_path,model)
+                best_loss = best_model(float(avg_loss/counter),best_loss,save_path,model, learn_rate, hidden_dim, n_out, n_layers, batch_size, EPOCHS, model_type, true_model)
         current_time = time.perf_counter()
         print("Epoch {}/{} Done, Total Loss: {}".format(epoch, EPOCHS, avg_loss/len(train_loader)))
         print("Total Time Elapsed: {} seconds".format(str(current_time-start_time)))
         epoch_times.append(current_time-start_time)
-        best_model(float(avg_loss/len(train_loader)),best_loss,save_path, model)
+        best_loss = best_model(float(avg_loss/len(train_loader)),best_loss,save_path, model, learn_rate, hidden_dim, n_out, n_layers, batch_size, EPOCHS, model_type, true_model)
         if epoch%n_epochs == 0:
-            save_path = save_path.split('.')[0]+'_'+str(epoch)+'.'+save_path.split('.')[1]
-            torch.save(model, save_path)
+            sv_path = save_path.split('.')[0]+'_'+str(epoch)+'.'+save_path.split('.')[1]
+            torch.save(model, sv_path)
     print("Total Training Time: {} seconds".format(str(sum(epoch_times))))
-    save_path = save_path.split('.')[0]+'_'+str(epoch)+'.'+save_path.split('.')[1]
-    torch.save(model, save_path)
+    sv_path = save_path.split('.')[0]+'_'+str(epoch)+'.'+save_path.split('.')[1]
+    torch.save(model, sv_path)
     return model
 
-def evaluate(model, test_data):#, label_scalers):
+def evaluate(model, test_data, device):#, label_scalers):
     model.eval()
     outputs = []
     targets = []
@@ -81,7 +103,7 @@ def evaluate(model, test_data):#, label_scalers):
     for x, label in test_data:
         inp = torch.from_numpy(np.array(x))
         labs = torch.from_numpy(np.array(label))
-        h = model.init_hidden(inp.shape[0])
+        h = model.init_hidden()
         out, h = model(inp.to(device).float(), h)
         # outputs.append(label_scalers[i].inverse_transform(out.cpu().detach().numpy()).reshape(-1))
         # targets.append(label_scalers[i].inverse_transform(labs.numpy()).reshape(-1))
@@ -89,7 +111,10 @@ def evaluate(model, test_data):#, label_scalers):
         targets.append(labs.numpy().reshape(-1))
     print("Evaluation Time: {}".format(str(time.perf_counter()-start_time)))
     sMAPE = 0
+    count = 0
     for i in range(len(outputs)):
-        sMAPE += np.mean(abs(outputs[i]-targets[i])/(targets[i]+outputs[i])/2)/len(outputs)
-    print("sMAPE: {}%".format(sMAPE*100))
+        for y,y__ in zip(targets[i],outputs[i]):
+            count+=1
+            sMAPE += abs(y__-y)/(abs(y)+abs(y__))/2
+    print("sMAPE: {}%".format(sMAPE/count*100))
     return outputs, targets, sMAPE
