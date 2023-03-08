@@ -25,7 +25,7 @@ class Recovery(nn.Module):
 
     def forward(self, x, h):
         out, h = self.main(x, h)
-        out = self.fc(self.sigmoid(out[:,-1]))
+        out = self.fc(self.sigmoid(out[:,-1])) ############################################33
         return(out, h)
 
     def init_hidden(self):

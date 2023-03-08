@@ -19,12 +19,23 @@ def order_batch(self, data, ind):
         d.append(i[ind])
     return(d)
 
-def correct_sequence(data):
+def correct_chronological_sequence(data):
     for c,i in enumerate(data[:,0]):
         if c==0:
             lim = i
         else:
             if i<lim:
+                lim = i
+            else:
+                return(False)
+    return(True)
+
+def correct_sequence(data):
+    for c,i in enumerate(data[:,0]):
+        if c==0:
+            lim = i
+        else:
+            if i>lim:
                 lim = i
             else:
                 return(False)
@@ -38,7 +49,11 @@ def data_loading(data, seq_len, n_signal):
 
     # Flip the data to make chronological data
     # data = data[::-1]
-    tabular = data[::-1]
+    #tabular = data[::-1]
+
+
+
+    tabular = data
 
     # tabular = tabular.fit_transform(data)
 
@@ -48,6 +63,7 @@ def data_loading(data, seq_len, n_signal):
 
     # Cut data by sequence length
     for i in range(0, len(tabular) - seq_len):
+        # if correct_chronological_sequence(tabular[i:i + seq_len]):
         if correct_sequence(tabular[i:i + seq_len]):
             _x = tabular[i:i + seq_len]
             pre_x = _x[:,1:n_signal]

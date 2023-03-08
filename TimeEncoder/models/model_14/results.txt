@@ -1,0 +1,4 @@
+hidden dim = 8
+batch size = 128
+sequence length = 12
+sMAPE = 23.586425058820367

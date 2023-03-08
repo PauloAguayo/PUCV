@@ -22,6 +22,7 @@ parser.add_argument("-nl", "--number_of_layers", type=int, default=3, help="numb
 parser.add_argument("-b", "--batch_size", type=int, default=16, help="batch size")
 parser.add_argument("-lr", "--learning_rate", type=float, default=0.001, help="learning rate for ADAM")
 parser.add_argument("-e", "--epochs", type=int, default=100, help="number of epochs")
+parser.add_argument('-bd',"--bidirectional", action='store_true', help="bidirectional model")
 args = parser.parse_args()
 vargs = vars(args)
 
@@ -34,6 +35,7 @@ batch_size = vargs["batch_size"] #16
 learning_rate = vargs["learning_rate"] #0.0001
 EPOCHS = vargs["epochs"] #100
 model_type = vargs["model_type"]
+bidirectional = vargs["bidirectional"]
 
 
 print('--> Loading data...')
@@ -66,6 +68,6 @@ else:
 
 path = os.path.join(model_path('models'),'t_encoder.pth')
 
-time_model = train(train_loader, learning_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS, 500, 10, path, model_type, vargs["model"])
+time_model = train(train_loader, learning_rate, hidden_dim, n_out, n_layers, batch_size, device, EPOCHS, 5000, 10, path, model_type, vargs["model"],seq_len, bidirectional)
 
 #gru_outputs, targets, gru_sMAPE = evaluate(time_model, test_loader)

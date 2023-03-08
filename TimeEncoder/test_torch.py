@@ -9,6 +9,20 @@ import os
 import argparse
 import matplotlib.pyplot as plt
 
+
+def details(path, hidden_dim, batch_size, seq_len, score ):
+    path_ = r"{}".format(path)
+    hd = 'hidden dim = '+str(hidden_dim)
+    bs = 'batch size = '+str(batch_size)
+    sl = 'sequence length = '+str(seq_len)
+    smape = 'sMAPE = '+str(score)
+    lines = [hd, bs, sl, smape]
+    new_path = path_.split("\\")[:-1]
+    with open(r"{}".format(os.path.join(*new_path,'results.txt')), 'w') as f:
+        for line in lines:
+            f.write(line)
+            f.write('\n')
+
 parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 parser.add_argument("-m", "--model", required=True, help="path to model")
 parser.add_argument("-d", "--data_test", required=True, help="path to data train file")
@@ -58,30 +72,34 @@ else:
 
 time_model = torch.load(vargs["model"])
 
-outputs, targets, gru_sMAPE = evaluate(time_model, test_loader, device)
+outputs, targets, sMAPE = evaluate(time_model, test_loader, device)
+
+details(vargs["model"],hidden_dim, batch_size, seq_len,sMAPE)
 
 plt.figure(figsize=(14,10))
 plt.subplot(2,2,1)
-plt.plot(outputs[0][-100:], "-o", color="g", label="Predicted")
-plt.plot(targets[0][-100:], color="b", label="Actual")
-plt.ylabel('Energy Consumption (MW)')
+plt.plot(outputs[0][:], "-o", color="g", label="Predicted")
+plt.plot(targets[0][:], color="b", label="Actual")
+plt.ylabel('Densidad2_')
 plt.legend()
 
 plt.subplot(2,2,2)
 plt.plot(outputs[8][-50:], "-o", color="g", label="Predicted")
 plt.plot(targets[8][-50:], color="b", label="Actual")
-plt.ylabel('Energy Consumption (MW)')
+plt.ylabel('Densidad2_')
 plt.legend()
 
 plt.subplot(2,2,3)
 plt.plot(outputs[4][:50], "-o", color="g", label="Predicted")
 plt.plot(targets[4][:50], color="b", label="Actual")
-plt.ylabel('Energy Consumption (MW)')
+plt.ylabel('Densidad2_')
 plt.legend()
 
 plt.subplot(2,2,4)
 plt.plot(outputs[6][:100], "-o", color="g", label="Predicted")
 plt.plot(targets[6][:100], color="b", label="Actual")
-plt.ylabel('Energy Consumption (MW)')
+plt.ylabel('Densidad2_')
 plt.legend()
+new_path = vargs["model"].split("\\")[:-1]
+plt.savefig(r"{}".format(os.path.join(*new_path,'plot.png')))
 plt.show()
