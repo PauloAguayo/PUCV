@@ -1,0 +1,11 @@
+learning rate = 0.001
+hidden dim = 8
+n neurons output = 1
+n layers = 3
+batch size = 128
+epochs = 100
+model type = GRU
+previous model = False
+best train error = 0.14990474173531168
+best test error = 0.21264851247514138
+sequence length = 6
