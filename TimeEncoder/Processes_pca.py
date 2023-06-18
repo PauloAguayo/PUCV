@@ -25,14 +25,10 @@ def train(train_loader, test_loader, learn_rate, hidden_dim, n_out, n_layers, ba
     model_embedder.to(device)
     model_estimator.to(device)
 
-    # criterion = nn.MSELoss()
     # criterion = SMAPELoss()
     criterion = WMAPELoss()
 
-    optimizer = torch.optim.Adam(list(model_estimator.parameters())+list(model_embedder.parameters()), lr=learn_rate)#, differentiable=True)
-    # optimizer = torch.optim.Adam([{'params':list(model_estimator.parameters())},{'params':list(model_embedder.parameters())}], lr=learn_rate, differentiable=True)
-    # optimizer = torch.optim.SGD(list(model_estimator.parameters())+list(model_embedder.parameters()), lr=learn_rate)
-    # scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer,milestones=[50],gamma=0.1)
+    optimizer = torch.optim.Adam(list(model_estimator.parameters())+list(model_embedder.parameters()), lr=learn_rate)
 
     best_loss_train = 10000000000
     best_loss_test = 10000000000
@@ -69,7 +65,7 @@ def train(train_loader, test_loader, learn_rate, hidden_dim, n_out, n_layers, ba
 
             out_r, h_r = model_estimator(out_e.to(device).float(), h_r)
 
-            train_loss = criterion(label.to(device).float(), out_r.to(device).float())
+            train_loss = criterion(label.to(device).float(), out_r)
 
             optimizer.zero_grad()
             train_loss.backward()
@@ -79,8 +75,6 @@ def train(train_loader, test_loader, learn_rate, hidden_dim, n_out, n_layers, ba
 
             if train_counter%n_steps == 0:
                 print("Epoch {}......Step: {}/{}....... Average Train Estimator Loss for Epoch: {}".format(epoch, train_counter, len(train_loader), avg_loss/train_counter))
-
-        # scheduler.step()
 
         model_embedder.eval()
         model_estimator.eval()
@@ -106,9 +100,9 @@ def train(train_loader, test_loader, learn_rate, hidden_dim, n_out, n_layers, ba
 
                 out_r, h_r = model_estimator(out_e.to(device).float(), h_r)
 
-                test_loss += criterion(y_test.to(device).float(), out_r.to(device).float()).item()
+                test_loss += criterion(y_test.to(device).float(), out_r).item()
 
-            validation_loss = float(test_loss/test_counter)
+        validation_loss = float(test_loss/test_counter) #######################################################################
 
         current_time = time.perf_counter()
         print("Epoch {}/{} Train Estimator Done, Total Loss: {}".format(epoch, EPOCHS, avg_loss/len(train_loader)))
@@ -133,25 +127,3 @@ def train(train_loader, test_loader, learn_rate, hidden_dim, n_out, n_layers, ba
     torch.save(model_estimator.state_dict(), sv_path_r)
     logs.losses(epoch_train_losses,epoch_test_losses)
     return(model_estimator)
-
-def evaluate(model, test_data, device):
-    model.eval()
-    outputs = []
-    targets = []
-    start_time = time.perf_counter()
-    for x, label in test_data:
-        inp = torch.from_numpy(np.array(x))
-        labs = torch.from_numpy(np.array(label))
-        h = model.init_hidden()
-        out, h = model(inp.to(device).float(), h)
-        outputs.append(out.cpu().detach().numpy().reshape(-1))
-        targets.append(labs.numpy().reshape(-1))
-    print("Evaluation Time: {}".format(str(time.perf_counter()-start_time)))
-    sMAPE = 0
-    count = 0
-    for i in range(len(outputs)):
-        for y,y__ in zip(targets[i],outputs[i]):
-            count+=1
-            sMAPE += abs(y__-y)/(abs(y)+abs(y__))/2
-    print("sMAPE: {}%".format(sMAPE/count*100))
-    return outputs, targets, sMAPE/count*100

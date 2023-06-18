@@ -12,20 +12,19 @@ class Estimator(nn.Module):
         self.batch_size = batch_size
         self.model_type = model_type
         self.seq_len = seq_len
-        self.dropout_prob = 0.3
 
         if self.model_type=='GRU':
-            self.main = nn.GRU(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True, dropout=self.dropout_prob)
+            self.main = nn.GRU(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True, bidirectional=True)
         else:
-            self.main = nn.LSTM(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True, dropout=self.dropout_prob)
-        self.fc = nn.Linear(self.hidden_dim*self.seq_len, self.n_out,device=self.device)
-        self.dropout = nn.Dropout(self.dropout_prob)
+            self.main = nn.LSTM(self.input_dim, self.hidden_dim, self.n_layers, batch_first=True)
+        self.fc = nn.Linear(2*self.hidden_dim*self.seq_len, self.n_out)
+
         self.tanh = nn.Tanh()
 
 
     def forward(self, x, h):
         out, h = self.main(x, h)
-        out = self.dropout(out)
+        h = torch.permute(h, (1, 0, 2))
         out = self.fc(self.tanh(torch.flatten(out, start_dim=1)))
         out = torch.reshape(out, (x.size()[0],1))
         return(out, h)
@@ -33,7 +32,7 @@ class Estimator(nn.Module):
     def init_hidden(self):
         weight = next(self.parameters()).data
         if self.model_type=='GRU':
-            hidden = weight.new(self.n_layers, self.batch_size, self.hidden_dim).zero_().requires_grad_().to(self.device)
+            hidden = weight.new(2*self.n_layers, self.batch_size, self.hidden_dim).zero_().requires_grad_().to(self.device)
         else:
             hidden = (weight.new(self.n_layers, self.batch_size, self.hidden_dim).zero_().to(self.device),
                   weight.new(self.n_layers, self.batch_size, self.hidden_dim).zero_().to(self.device))
@@ -49,32 +48,31 @@ class Embedder(nn.Module):
         self.device = device
         self.batch_size = batch_size
         self.model_type = model_type
-        self.dropout_prob = 0.3
 
         if self.model_type=='GRU':
-            self.main = nn.GRU(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True, dropout=self.dropout_prob)
+            self.main = nn.GRU(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True,bidirectional=True)
         else:
-            self.main = nn.LSTM(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True, dropout=self.dropout_prob)
-        self.fc = nn.Linear(self.hidden_dim, self.n_out,device=self.device)
-        self.fc_norm = nn.Linear(self.input_dim, self.hidden_dim, device=self.device)
+            self.main = nn.LSTM(self.input_dim, self.hidden_dim, self.n_layers, batch_first=True)
+        self.fc = nn.Linear(self.hidden_dim*2, self.n_out)
+        self.fc_norm = nn.Linear(self.input_dim, self.hidden_dim)
 
+        self.tanh = nn.Tanh()
         self.sigmoid = nn.Sigmoid()
-        self.dropout = nn.Dropout(self.dropout_prob)
 
     def forward(self, x, h):
         x = self.fc_norm(x)
         x = self.sigmoid(x)
         out, h = self.main(x, h)
-        out = self.dropout(out)
+        h = torch.permute(h, (1, 0, 2))
         out = self.sigmoid(self.fc(out))
-        out = torch.add(out,x,alpha=1)
+        out = torch.add(out, x, alpha=1)
         return(out, h)
 
     def init_hidden(self):
         weight = next(self.parameters()).data
 
         if self.model_type=='GRU':
-            hidden = weight.new(self.n_layers, self.batch_size, self.hidden_dim).zero_().requires_grad_().to(self.device)
+            hidden = weight.new(2*self.n_layers, self.batch_size, self.hidden_dim).zero_().requires_grad_().to(self.device)
         else:
             hidden = (weight.new(self.n_layers, self.batch_size, self.hidden_dim).zero_().to(self.device),
                   weight.new(self.n_layers, self.batch_size, self.hidden_dim).zero_().to(self.device))

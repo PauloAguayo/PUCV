@@ -89,6 +89,12 @@ def model_path(path):
                 os.mkdir(os.path.join(path,new_path))
                 return(os.path.join(path,new_path))
 
+def model_path_pca(path,signal):
+    if not os.path.exists(os.path.join(path,'model_'+signal)):
+    #if not os.listdir(os.path.join(path,'model_'+signal)): # empty directory
+        os.mkdir(os.path.join(path,'model_'+signal))
+        return(os.path.join(path,'model_'+signal))
+
 def order_batch(self, data, ind):
     d = []
     for i in data:
@@ -117,32 +123,96 @@ def correct_sequence(data):
                 return(False)
     return(True)
 
-def data_loading(data, seq_len, n_signal):
-    train_length = len(data)
-    # tab = MinMaxScaler()
+def exponential_smoothing(table, active, past):
+    table_copy = table
+    alpha = 0.05
+    if active:
+        past = table[0]
 
-    # Flip the data to make chronological data
-    # data = data[::-1]
-    # tabular = data[::-1]
+    for i in range(len(table)):
+        table_copy[i] = np.add(alpha*table[i],(1-alpha)*past)
+        past = table_copy[i]
 
-    tabular = data
-    # tabular = tab.fit_transform(data)
+    return(table_copy,past)
 
-    # Preprocess the dataset
+def exponential_smoothing_decom(table):
+    table_copy = table
+    alpha = 0.05
+    past = table[0]
+
+    for i in range(len(table)):
+        table_copy[i] = np.add(alpha*table[i],(1-alpha)*past)
+        past = table_copy[i]
+
+    return(table_copy)
+
+def privileged_data_loading(tabular, seq_len, n_signal):
+
+    train_data = []
+    privileged_train_data = []
+    labels_data = []
+
+    # Cut data by sequence length
+    for i in range(0, len(tabular) - seq_len):
+        if i == 0:
+            active = True
+            past = 0
+
+        if correct_sequence(tabular[i:i + seq_len]):
+            _x = tabular[i:i + seq_len]
+            _x, past = exponential_smoothing(_x,active,past)
+            active = False
+
+            gm = [_x[-1,k] for k in n_signal]
+            labels_data.append(gm)
+
+            privileged_train_data.append(_x[:,1:])
+
+            _x = np.delete(_x, n_signal, axis=1)
+            train_data.append(_x[:,1:])
+        else:
+            active = True
+            past = 0
+
+
+    # Mix the datasets (to make it similar to i.i.d)
+    idx = np.random.permutation(len(train_data))
+    data_train = []
+    data_labels = []
+    data_privileged = []
+    for i in range(len(train_data)):
+        data_train.append(train_data[idx[i]])
+        data_labels.append(labels_data[idx[i]])
+        data_privileged.append(privileged_train_data[idx[i]])
+    return(data_train, data_privileged, data_labels)
+
+def data_loading(tabular, seq_len, n_signal): #"tabular" era "data"
+
     train_data = []
     labels_data = []
 
     # Cut data by sequence length
     for i in range(0, len(tabular) - seq_len):
+        if i == 0:
+            active = True
+            past = 0
         # if correct_chronological_sequence(tabular[i:i + seq_len]):
         if correct_sequence(tabular[i:i + seq_len]):
             _x = tabular[i:i + seq_len]
-            pre_x = _x[:,1:n_signal]
-            post_x = _x[:,n_signal+1:]
-            labels_data.append(_x[-1,n_signal])
+            _x, past = exponential_smoothing(_x,active,past)
+            active = False
 
-            _x = np.hstack((pre_x, post_x))
-            train_data.append(_x)
+            # pre_x = _x[:,1:n_signal]
+            # post_x = _x[:,n_signal+1:]
+            gm = [_x[-1,k] for k in n_signal]
+            labels_data.append(gm)
+
+            _x = np.delete(_x, n_signal, axis=1)
+            # _x = np.hstack((pre_x, post_x))
+            train_data.append(_x[:,1:])
+        else:
+            active = True
+            past = 0
 
 
     # Mix the datasets (to make it similar to i.i.d)
@@ -152,4 +222,37 @@ def data_loading(data, seq_len, n_signal):
     for i in range(len(train_data)):
         data_train.append(train_data[idx[i]])
         data_train_lab.append(labels_data[idx[i]])
-    return([data_train,data_train_lab])
+    return(data_train,data_train_lab)
+
+def data_loading_decom(tabular, n_signal): #"tabular" era "data"
+
+    train_data = []
+    labels_data = []
+
+    # Cut data by sequence length
+    value = 0
+    begin = 0
+    for i,c in enumerate(tabular):
+        if c[0]>=value:
+            value = c[0]
+        else:
+            value = 0
+            _x = tabular[begin:i]
+            begin = i
+            _x = exponential_smoothing_decom(_x)
+            gm = [_x[:,k] for k in n_signal]
+            labels_data.append(gm)
+
+            _x = np.delete(_x, n_signal, axis=1)
+
+            train_data.append(_x[:,1:])
+
+
+    # Mix the datasets (to make it similar to i.i.d)
+    idx = np.random.permutation(len(train_data))
+    data_train = []
+    data_train_lab = []
+    for i in range(len(train_data)):
+        data_train.append(train_data[idx[i]])
+        data_train_lab.append(labels_data[idx[i]])
+    return(data_train,data_train_lab)
