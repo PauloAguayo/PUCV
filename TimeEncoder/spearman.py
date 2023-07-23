@@ -55,6 +55,7 @@ for d in descargas_train:
     max_init = max_fin+max_init+1
     max_fin = 0
     n_mat +=1
+
 # ------------------------------------------------------------------------------
 # ------------------------------------------------------------------------------
 matrices_corr = np.array(matrices_corr)
@@ -78,6 +79,6 @@ print(df_promedio_corr)
 print('-------------------------------------------------------------------------')
 print('Promedio de valores p:')
 print(df_promedio_pval)
-df_promedio_corr.to_csv('spearman_corr.csv')
-df_promedio_pval.to_csv('spearman_pval.csv')
+df_promedio_corr.to_csv('spearman_corr.csv', sep=';', float_format="%.8f")
+df_promedio_pval.to_csv('spearman_pval.csv', sep=';', float_format="%.8f")
 # ------------------------------------------------------------------------------

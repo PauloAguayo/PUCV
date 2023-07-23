@@ -45,12 +45,12 @@ test_path = vargs["data_test"] #"data_train_24.csv"
 test_df = pd.read_csv(test_path)
 
 
-data_train = data_loading(train_df.values, seq_len=seq_len, n_signal=n_signal)
-train_data = TensorDataset(torch.from_numpy(np.array(data_train[0])), torch.from_numpy(np.array(data_train[1])))
+data_train, label_train = data_loading(train_df.values, seq_len=seq_len, n_signal=n_signal)
+train_data = TensorDataset(torch.from_numpy(np.array(data_train)), torch.from_numpy(np.array(label_train)))
 train_loader = DataLoader(train_data, batch_size=batch_size, drop_last=True, shuffle=True)
 
-data_test = data_loading(test_df.values, seq_len=seq_len, n_signal=n_signal)
-test_data = TensorDataset(torch.from_numpy(np.array(data_test[0])), torch.from_numpy(np.array(data_test[1])))
+data_test, label_test = data_loading(test_df.values, seq_len=seq_len, n_signal=n_signal)
+test_data = TensorDataset(torch.from_numpy(np.array(data_test)), torch.from_numpy(np.array(label_test)))
 test_loader = DataLoader(test_data, batch_size=batch_size, drop_last=True, shuffle=True)
 
 

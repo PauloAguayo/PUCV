@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import numpy as np
 
 
 class SMAPELoss(nn.Module):
@@ -25,3 +26,12 @@ class WMAPELoss(nn.Module):
         wmape = torch.div(delta_y, scale)
         wmape = torch.nan_to_num(wmape, nan=10.0, posinf=10.0, neginf=-10.0)
         return(wmape)
+
+
+def WMAPE(y,y_hat):
+    y = np.array(y)
+    y_hat = np.array(y_hat)
+    delta_y = np.sum(np.abs(y-y_hat))
+    scale = np.sum(np.abs(y))
+    wmape = delta_y/float(scale)
+    return(wmape)

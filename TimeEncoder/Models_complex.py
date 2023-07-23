@@ -12,7 +12,7 @@ class Estimator(nn.Module):
         self.batch_size = batch_size
         self.model_type = model_type
         self.seq_len = seq_len
-        self.dropout_prob = 0.3
+        self.dropout_prob = 0.0
 
         if self.model_type=='GRU':
             self.main = nn.GRU(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True, dropout=self.dropout_prob)
@@ -25,8 +25,8 @@ class Estimator(nn.Module):
 
     def forward(self, x, h):
         out, h = self.main(x, h)
-        out = self.dropout(out)
         out = self.fc(self.tanh(torch.flatten(out, start_dim=1)))
+        out = self.dropout(out)
         out = torch.reshape(out, (x.size()[0],1))
         return(out, h)
 
@@ -49,7 +49,7 @@ class Embedder(nn.Module):
         self.device = device
         self.batch_size = batch_size
         self.model_type = model_type
-        self.dropout_prob = 0.3
+        self.dropout_prob = 0.0
 
         if self.model_type=='GRU':
             self.main = nn.GRU(self.hidden_dim, self.hidden_dim, self.n_layers, batch_first=True, dropout=self.dropout_prob)
@@ -64,9 +64,10 @@ class Embedder(nn.Module):
     def forward(self, x, h):
         x = self.fc_norm(x)
         x = self.sigmoid(x)
+        x = self.dropout(x)
         out, h = self.main(x, h)
-        out = self.dropout(out)
         out = self.sigmoid(self.fc(out))
+        out = self.dropout(out)
         out = torch.add(out,x,alpha=1)
         return(out, h)
 

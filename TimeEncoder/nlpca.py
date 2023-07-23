@@ -3,8 +3,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
-from sklearn.decomposition import PCA
-from scipy.stats import spearmanr
+from sklearn.decomposition import KernelPCA
+from sklearn.preprocessing import StandardScaler
 import warnings
 warnings.filterwarnings("ignore")
 # ------------------------------------------------------------------------------
@@ -19,10 +19,11 @@ descargas_train = open('descargas_train.txt','r')
 max_init = 0
 max_fin = 0
 matrices = []
-pca_e_v = []
-pca_dens = []
-pca_p = []
-for d in descargas_test:
+nlpca_e_v = []
+nlpca_dens = []
+print('test')
+for n,d in enumerate(descargas_test):
+    print(n)
     file_temporal = file_test.iloc[max_init:]
     time = file_temporal['time'].tolist()
     for c,t in enumerate(time):
@@ -36,38 +37,34 @@ for d in descargas_test:
     dens = mat['Densidad2_'].tolist()
     mat2 = mat.drop(columns=['time','Densidad2_'])
 
-    pca = PCA(n_components=8)
-    pca.fit_transform(mat2)
+    nlpca = KernelPCA(n_components=8, kernel='rbf', copy_X=False)  # Configurar el modelo con el número deseado de componentes y el kernel adecuado
+    nlpca_features = nlpca.fit_transform(mat2)
 
-    pca_features=pca.fit_transform(mat2)
+    correlaciones = np.corrcoef(nlpca_features.T, dens)
+    correlacion_principal = correlaciones[-1, :-1]  # Última fila, todas las columnas excepto la última
 
-    #correlaciones = np.corrcoef(pca_features.T, dens)
-    #correlacion_principal = correlaciones[-1, :-1]  # Última fila, todas las columnas excepto la última
+    loadings = nlpca.eigenvectors_
 
-    correlacion, p_ = spearmanr(pca_features, dens)
+    loadings = mat2.values.T.dot(loadings)
+    explained_variance_ = nlpca.eigenvalues_ / sum(nlpca.eigenvalues_)
 
-    correlacion_principal = correlacion[-1,:-1]
-    p_principal = p_[-1,:-1]
+    nlpca_loadings = [f'PC{i}' for i in list(range(1, len(loadings) + 1))]
 
-    loadings = pca.components_
-    n_features = pca.n_features_
-
-    pca_loadings = [f'PC{i}' for i in list(range(1, len(loadings) + 1))]
-
-    loadings_df = pd.DataFrame.from_dict(dict(zip(pca_loadings, loadings)))
+    loadings_df = pd.DataFrame.from_dict(dict(zip(nlpca_loadings, loadings)))
     loadings_df.index.name = 'feature_names'
     loadings_df.index = ['ACTON275', 'BOL5', 'ECE7','GR','GR2','HALFAC3','IACCEL1','RX306']
     matrices.append(loadings_df)
-    pca_e_v.append(np.array(pca.explained_variance_.tolist()))
-    pca_dens.append(correlacion_principal)
-    pca_p.append(p_principal)
+    nlpca_e_v.append(np.array(explained_variance_))
+    nlpca_dens.append(correlacion_principal)
 
     max_init += max_fin+1
     max_fin = 0
 
 max_init = 0
 max_fin = 0
-for d in descargas_train:
+print('train')
+for n,d in enumerate(descargas_train):
+    print(n)
     file_temporal = file_train.iloc[max_init:]
     time = file_temporal['time'].tolist()
     for c,t in enumerate(time):
@@ -81,31 +78,25 @@ for d in descargas_train:
     dens = mat['Densidad2_'].tolist()
     mat2 = mat.drop(columns=['time','Densidad2_'])
 
-    pca = PCA(n_components=8)
-    pca.fit_transform(mat2)
+    nlpca = KernelPCA(n_components=8, kernel='rbf',copy_X=False)  # Configurar el modelo con el número deseado de componentes y el kernel adecuado
+    nlpca_features = nlpca.fit_transform(mat2)
 
-    pca_features=pca.fit_transform(mat2)
+    correlaciones = np.corrcoef(nlpca_features.T, dens)
+    correlacion_principal = correlaciones[-1, :-1]  # Última fila, todas las columnas excepto la última
 
-    # correlaciones = np.corrcoef(pca_features.T, dens)
-    # correlacion_principal = correlaciones[-1, :-1]  # Última fila, todas las columnas excepto la última
+    loadings = nlpca.eigenvectors_
 
-    correlacion, p_ = spearmanr(pca_features, dens)
+    loadings = mat2.values.T.dot(loadings)
+    explained_variance_ = nlpca.eigenvalues_ / sum(nlpca.eigenvalues_)
 
-    correlacion_principal = correlacion[-1,:-1]
-    p_principal = p_[-1,:-1]
+    nlpca_loadings = [f'PC{i}' for i in list(range(1, len(loadings) + 1))]
 
-    loadings = pca.components_
-    n_features = pca.n_features_
-
-    pca_loadings = [f'PC{i}' for i in list(range(1, len(loadings) + 1))]
-
-    loadings_df = pd.DataFrame.from_dict(dict(zip(pca_loadings, loadings)))
+    loadings_df = pd.DataFrame.from_dict(dict(zip(nlpca_loadings, loadings)))
     loadings_df.index.name = 'feature_names'
     loadings_df.index = ['ACTON275', 'BOL5', 'ECE7','GR','GR2','HALFAC3','IACCEL1','RX306']
     matrices.append(loadings_df)
-    pca_e_v.append(np.array(pca.explained_variance_.tolist()))
-    pca_dens.append(correlacion_principal)
-    pca_p.append(p_principal)
+    nlpca_e_v.append(np.array(explained_variance_))
+    nlpca_dens.append(correlacion_principal)
 
     max_init += max_fin+1
     max_fin = 0
@@ -122,19 +113,20 @@ for df in matrices:
 # Calcula el promedio dividiendo el dataframe acumulativo entre el número de dataframes
 promedio_dataframe = suma_dataframes / num_dataframes
 
+# Si deseas obtener el promedio como un nuevo dataframe
+# promedio_dataframe = pd.DataFrame.mean(suma_dataframes)
+
 print(promedio_dataframe)
 
-arreglo_listas = np.array(pca_e_v)
-arreglo_listas_dens = np.array(pca_dens)
-arreglo_listas_p = np.array(pca_p)
+arreglo_listas = np.array(nlpca_e_v)
+arreglo_listas_dens = np.array(nlpca_dens)
 vector_promedio = np.mean(arreglo_listas, axis=0)
 vector_promedio_dens = np.mean(arreglo_listas_dens, axis=0)
-vector_promedio_p = np.mean(arreglo_listas_p, axis=0)
 print(vector_promedio)
 
 print("Correlaciones:")
-for i, (correlacion,v_p) in enumerate(zip(vector_promedio_dens,vector_promedio_p)):
-    print(f"Componente Principal {i+1} - Correlacion: {correlacion}, Valor p:{v_p}")
+for i, correlacion in enumerate(vector_promedio_dens):
+    print(f"Componente Principal {i+1}: {correlacion}")
 
 
 plt.bar(range(1,len(vector_promedio)+1),vector_promedio)
