@@ -39,8 +39,8 @@ n_signal = 3
 model_embedder = Embedder(input_dim, hidden_dim, n_layers, batch_size, device, model_type)
 model_estimator = Estimator(input_dim, hidden_dim, n_out, n_layers, batch_size, device, model_type, seq_len)
 
-model_embedder.load_state_dict(torch.load('models/model_49/t_encoder_embedder_test_best.pth'))# 39
-model_estimator.load_state_dict(torch.load('models/model_49/t_encoder_estimator_test_best.pth')) # 39
+model_embedder.load_state_dict(torch.load('/home/paulo/Documents/modelos_tesis/GRU/t_encoder_embedder_test_best.pth'))# 39
+model_estimator.load_state_dict(torch.load('/home/paulo/Documents/modelos_tesis/GRU/t_encoder_estimator_test_best.pth')) # 39
 model_embedder.eval()
 model_estimator.eval()
 
@@ -105,6 +105,7 @@ for tab in diccionario:
             f.write(',')
             f.write(str(line))
             f.write('\n')
+
 
 # sMAPE = 0
 # count = 0

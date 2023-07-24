@@ -15,35 +15,42 @@ parser.add_argument("-t", "--data_test", required=True, help="path to data test 
 # parser.add_argument("-i", "--input", default=0, type=str, help="path to optional input image file", required=True)
 # parser.add_argument("-o", "--output", type=str, default="results/output.jpg", help="path and name to optional output image file")
 parser.add_argument("-mt", "--model_type", type=str, default="GRU", help="GRU or LSTM")
-parser.add_argument("-sl", "--sequence_length", type=int, default=24, help="sequence length for time interval")
-parser.add_argument("-sn", "--signal_number",nargs='+', type=int, default=3, help="signal index as gt")
-parser.add_argument("-hd", "--hidden_dim", type=int, default=8, help="hidden dim")
+parser.add_argument("-sl", "--sequence_length", type=int, default=9, help="sequence length for time interval")
+parser.add_argument("-sn", "--signal_number",nargs='+', type=int, default=3, required=True, help="signal index as gt")
+parser.add_argument("-hd", "--hidden_dim", type=int, default=36, help="hidden dim")
 #parser.add_argument("-no", "--camera_height", type=float, default=2.5, help="z-coordinate for camera positioning")
 parser.add_argument("-nl", "--number_of_layers", type=int, default=3, help="number of layers for model")
-parser.add_argument("-b", "--batch_size", type=int, default=16, help="batch size")
+parser.add_argument("-b", "--batch_size", type=int, default=64, help="batch size")
 parser.add_argument("-lr", "--learning_rate", type=float, default=0.001, help="learning rate for ADAM")
 parser.add_argument("-e", "--epochs", type=int, default=100, help="number of epochs")
 args = parser.parse_args()
 vargs = vars(args)
 
-seq_len = vargs["sequence_length"] #24
-n_signal = vargs["signal_number"] #3
-hidden_dim = vargs["hidden_dim"] #8
+seq_len = vargs["sequence_length"]
+n_signal = vargs["signal_number"]
+hidden_dim = vargs["hidden_dim"]
 n_out = 1
-n_layers = vargs["number_of_layers"] #3
-batch_size = vargs["batch_size"] #16
-learning_rate = vargs["learning_rate"] #0.0001
-EPOCHS = vargs["epochs"] #100
+n_layers = vargs["number_of_layers"]
+batch_size = vargs["batch_size"]
+learning_rate = vargs["learning_rate"]
+EPOCHS = vargs["epochs"]
 model_type = vargs["model_type"]
 
 
 print('--> Loading data...')
-train_path = vargs["data_train"] #"data_train_24.csv"
+train_path = vargs["data_train"]
 train_df = pd.read_csv(train_path)
 
-test_path = vargs["data_test"] #"data_train_24.csv"
+# -----------------------------------------
+#train_df = train_df.drop(columns='IACCEL1')
+# -----------------------------------------
+
+test_path = vargs["data_test"]
 test_df = pd.read_csv(test_path)
 
+# -----------------------------------------
+#test_df = test_df.drop(columns='IACCEL1')
+# -----------------------------------------
 
 data_train, label_train = data_loading(train_df.values, seq_len=seq_len, n_signal=n_signal)
 train_data = TensorDataset(torch.from_numpy(np.array(data_train)), torch.from_numpy(np.array(label_train)))

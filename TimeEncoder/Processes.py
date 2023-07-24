@@ -34,7 +34,7 @@ def train(train_loader, test_loader, learn_rate, hidden_dim, n_out, n_layers, ba
     best_loss_train = 10000000000
     best_loss_test = 10000000000
 
-    logs = Logs(save_path, learn_rate, hidden_dim, n_out, n_layers, batch_size, EPOCHS, model_type, true_model, seq_len, best_loss_train, best_loss_test, model_embedder, model_estimator, optimizer)
+    logs = Logs(save_path, learn_rate, hidden_dim, n_out, n_layers, batch_size, EPOCHS, model_type, true_model, seq_len, best_loss_train, best_loss_test, model_embedder, model_estimator)#, optimizer)
 
     print("--> Starting Training")
     print("-->", str(model_type), "net")
@@ -119,7 +119,7 @@ def train(train_loader, test_loader, learn_rate, hidden_dim, n_out, n_layers, ba
         epoch_train_losses.append(avg_loss/len(train_loader))
         epoch_test_losses.append(validation_loss)
 
-        best_loss_train, best_loss_test = logs.best_model(avg_loss/len(train_loader), validation_loss, model_estimator, model_embedder, optimizer)
+        best_loss_train, best_loss_test = logs.best_model(avg_loss/len(train_loader), validation_loss, model_estimator, model_embedder)#, optimizer)
 
         if epoch%n_epochs == 0:
             sv_path_e = save_path.split('.')[0]+'_embedder'+'_'+str(epoch)+'.'+save_path.split('.')[1]
